@@ -1,22 +1,30 @@
+// -------------------------------------------------------------------
+// Librerias
+// -------------------------------------------------------------------
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
-//--------------------------------------------
+
+// -------------------------------------------------------------------
 // Archivos *.hpp - Fragmentar el Código
-//--------------------------------------------
+// -------------------------------------------------------------------
 #include "settings.hpp"
 #include "functions.hpp"
 #include "settingsReset.hpp"
 #include "settingsRead.hpp"
 #include "settingsSave.hpp"
 #include "esp32_wifi.hpp"
+#include "esp32_mqtt.hpp"
 
+// -------------------------------------------------------------------
+// Setup
+// -------------------------------------------------------------------
 void setup() {
-  // Baurate
-  Serial.begin(115200);
-   // CPU Freq
-  setCpuFrequencyMhz(240);
-  // Inicio del Log por serial
+    // Baudrate
+    Serial.begin(115200);
+    // CPU Freq
+    setCpuFrequencyMhz(240);
+    // Inicio del Log por serial
     log("\nInfo: Iniciando Setup");
     // Configurar los Pines
     settingPines();
@@ -25,6 +33,11 @@ void setup() {
         log(F("Error: Falló la inicialización del SPIFFS"));
         while (true);
     }
+    // Lee los estados de los Relays
+    settingsReadRelays();
+    // Paso estados a los pines de los Relays
+    setOnOffSingle(RELAY1,Relay01_status);
+    setOnOffSingle(RELAY2,Relay02_status);
     // Lee la Configuración WiFi
     settingsReadWiFi();
     // Configuracion WIFI
@@ -32,7 +45,8 @@ void setup() {
     delay(1000);
     // Setup del WiFI
     wifi_setup(); 
-     
+    // Lee la Configuración MQTT
+    settingsReadMQTT();
 }
 
 
@@ -50,6 +64,20 @@ void loop() {
     }else if (wifi_mode == WIFI_AP){
         wifiAPLoop();
     } 
+    // -------------------------------------------------------------------
+    // MQTT
+    // -------------------------------------------------------------------
+    if ((WiFi.status() == WL_CONNECTED) && (wifi_mode == WIFI_STA)){
+        if(mqtt_server != 0){
+            mqttLoop();
+            if (mqttclient.connected()){
+                if (millis() - lastMsg > mqtt_time){
+                    lastMsg = millis();
+                    mqtt_publish();
+                }
+            }      
+        }
+    }
 
 
 }
